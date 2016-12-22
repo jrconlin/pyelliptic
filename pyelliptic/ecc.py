@@ -68,10 +68,12 @@ class ECC:
     """
 
     def __init__(self, pubkey=None, privkey=None, pubkey_x=None,
-                 pubkey_y=None, raw_privkey=None, curve='sect283r1'):
+                 pubkey_y=None, raw_privkey=None, curve='sect283r1',
+                 hasher='sha256'):
         """
-        For a normal and High level use, specifie pubkey,
-        privkey (if you need) and the curve
+        For a normal and High level use, specify pubkey,
+        privkey (if you need), the curve, and the hashing method.
+
         """
         if type(curve) == str:
             self.curve = OpenSSL.get_curve(curve)
@@ -87,6 +89,14 @@ class ECC:
             self._set_keys(pubkey_x, pubkey_y, raw_privkey)
         else:
             self.privkey, self.pubkey_x, self.pubkey_y = self._generate()
+
+        _hashers = {
+            "sha256": OpenSSL.EVP_sha256(),
+            "sha384": OpenSSL.EVP_sha384(),
+            "sha512": OpenSSL.EVP_sha512(),
+        }
+        self.hashval = hasher
+        self.hasher = _hashers[hasher]
 
     def _set_keys(self, pubkey_x, pubkey_y, privkey):
         if self.raw_check_key(privkey, pubkey_x, pubkey_y) < 0:
@@ -414,7 +424,7 @@ class ECC:
                 raise Exception("[OpenSSL] EC_KEY_check_key FAIL ... " + OpenSSL.get_error())
 
             OpenSSL.EVP_MD_CTX_init(md_ctx)
-            OpenSSL.EVP_DigestInit_ex(md_ctx, OpenSSL.EVP_sha256(), None)
+            OpenSSL.EVP_DigestInit_ex(md_ctx, self.hasher, None)
 
             if (OpenSSL.EVP_DigestUpdate(md_ctx, buff, size)) == 0:
                 raise Exception("[OpenSSL] EVP_DigestUpdate FAIL ... " + OpenSSL.get_error())
@@ -466,12 +476,10 @@ class ECC:
                 raise Exception("[OpenSSL] EC_KEY_set_public_key FAIL ... " + OpenSSL.get_error())
             if (OpenSSL.EC_KEY_check_key(key)) == 0:
                 raise Exception("[OpenSSL] EC_KEY_check_key FAIL ... " + OpenSSL.get_error())
-
             OpenSSL.EVP_MD_CTX_init(md_ctx)
-            OpenSSL.EVP_DigestInit_ex(md_ctx, OpenSSL.EVP_sha256(), None)
+            OpenSSL.EVP_DigestInit_ex(md_ctx, self.hasher, None)
             if (OpenSSL.EVP_DigestUpdate(md_ctx, binputb, len(inputb))) == 0:
                 raise Exception("[OpenSSL] EVP_DigestUpdate FAIL ... " + OpenSSL.get_error())
-
             OpenSSL.EVP_DigestFinal_ex(md_ctx, digest, dgst_len)
             ret = OpenSSL.ECDSA_verify(
                 0, digest, dgst_len.contents, bsig, len(sig), key)
